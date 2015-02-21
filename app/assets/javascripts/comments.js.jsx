@@ -1,83 +1,6 @@
-var CommentBox = React.createClass({displayName: 'CommentBox',
-  render: function() {
-    return (
-      React.createElement('div', {className: "commentBox"},
-        "Hello, world! I am a CommentBox."
-      )
-    );
-  }
-});
 
-// tutorial2.js
-var CommentList = React.createClass({
-  render: function() {
-    return (
-      <div className="commentList">
-        Hello, world! I am a CommentList.
-      </div>
-    );
-  }
-});
-
-// tutorial15.js
-// tutorial16.js
-var CommentForm = React.createClass({
-  handleSubmit: function(e) {
-    e.preventDefault();
-    var author = this.refs.author.getDOMNode().value.trim();
-    var text = this.refs.text.getDOMNode().value.trim();
-    if (!text || !author) {
-      return;
-    }
-    // TODO: send request to the server
-    this.refs.author.getDOMNode().value = '';
-    this.refs.text.getDOMNode().value = '';
-  },
-  render: function() {
-    return (
-      <form className="commentForm" onSubmit={this.handleSubmit}>
-        <input type="text" placeholder="Your name" ref="author" />
-        <input type="text" placeholder="Say something..." ref="text" />
-        <input type="submit" value="Post" />
-      </form>
-    );
-  }
-});
-
-// tutorial3.js
-// tutorial4.js
-// tutorial10.js
-var CommentList = React.createClass({
-  render: function() {
-    var commentNodes = this.props.data.map(function (comment) {
-      return (
-        <Comment author={comment.author}>
-          {comment.text}
-        </Comment>
-      );
-    });
-    return (
-      <div className="commentList">
-        {commentNodes}
-      </div>
-    );
-  }
-});
-// tutorial5.js
-var Comment = React.createClass({
-  render: function() {
-    return (
-      <div className="comment">
-        <h2 className="commentAuthor">
-          {this.props.author}
-        </h2>
-        {this.props.children}
-      </div>
-    );
-  }
-});
-// tutorial7.js
 var converter = new Showdown.converter();
+
 var Comment = React.createClass({
   render: function() {
     var rawMarkup = converter.makeHtml(this.props.children.toString());
@@ -92,14 +15,6 @@ var Comment = React.createClass({
   }
 });
 
-// tutorial8.js
-var data = [
-  {author: "Pete Hunt", text: "This is one comment"},
-  {author: "Jordan Walke", text: "This is *another* comment"}
-];
-
-// tutorial14.js
-// tutorial20.js
 var CommentBox = React.createClass({
   loadCommentsFromServer: function() {
     $.ajax({
@@ -115,19 +30,23 @@ var CommentBox = React.createClass({
   },
   handleCommentSubmit: function(comment) {
     var comments = this.state.data;
-    var newComments = comments.concat([comment]);
-    this.setState({data: newComments});
-    $.ajax({
-      url: this.props.url,
-      dataType: 'json',
-      type: 'POST',
-      data: comment,
-      success: function(data) {
-        this.setState({data: data});
-      }.bind(this),
-      error: function(xhr, status, err) {
-        console.error(this.props.url, status, err.toString());
-      }.bind(this)
+    comments.push(comment);
+    this.setState({data: comments}, function() {
+      // `setState` accepts a callback. To avoid (improbable) race condition,
+      // `we'll send the ajax request right after we optimistically set the new
+      // `state.
+      $.ajax({
+        url: this.props.url,
+        dataType: 'json',
+        type: 'POST',
+       	data: { comment: comment },
+        success: function(data) {
+          this.setState({data: data});
+        }.bind(this),
+        error: function(xhr, status, err) {
+          console.error(this.props.url, status, err.toString());
+        }.bind(this)
+      });
     });
   },
   getInitialState: function() {
@@ -148,6 +67,48 @@ var CommentBox = React.createClass({
   }
 });
 
+var CommentList = React.createClass({
+  render: function() {
+    var commentNodes = this.props.data.map(function(comment, index) {
+      return (
+        // `key` is a React-specific concept and is not mandatory for the
+        // purpose of this tutorial. if you're curious, see more here:
+        // http://facebook.github.io/react/docs/multiple-components.html#dynamic-children
+        <Comment author={comment.author} key={index}>
+          {comment.text}
+        </Comment>
+      );
+    });
+    return (
+      <div className="commentList">
+        {commentNodes}
+      </div>
+    );
+  }
+});
+
+var CommentForm = React.createClass({
+  handleSubmit: function(e) {
+    e.preventDefault();
+    var author = this.refs.author.getDOMNode().value.trim();
+    var text = this.refs.text.getDOMNode().value.trim();
+    if (!text || !author) {
+      return;
+    }
+    this.props.onCommentSubmit({author: author, text: text});
+    this.refs.author.getDOMNode().value = '';
+    this.refs.text.getDOMNode().value = '';
+  },
+  render: function() {
+    return (
+      <form className="commentForm" onSubmit={this.handleSubmit}>
+        <input type="text" placeholder="Your name" ref="author" />
+        <input type="text" placeholder="Say something..." ref="text" />
+        <input type="submit" value="Post" />
+      </form>
+    );
+  }
+});
 $(function() {
   React.renderComponent(
     <CommentBox url="comments.json" pollInterval={2000} />,
